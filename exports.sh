@@ -1,4 +1,4 @@
-export ADDRESS=ec2-18-118-222-241.us-east-2.compute.amazonaws.com
+export ADDRESS=http://ec2-18-118-222-241.us-east-2.compute.amazonaws.com
 export DATASET=visualwebarena
 export CLASSIFIEDS="$ADDRESS:9980"
 export CLASSIFIEDS_RESET_TOKEN="4b61655535e7ed388f0d40a93600254c"  # Default reset token for classifieds site, change if you edited its docker-compose.yml
