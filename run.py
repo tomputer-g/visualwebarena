@@ -410,6 +410,8 @@ def test(
                     if isinstance(agent, PromptAgent)
                     else None,
                 )
+                
+                print("Action: " + str(action_str))
                 render_helper.render(
                     action, state_info, meta_data, args.render_screenshot
                 )
