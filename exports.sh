@@ -7,4 +7,4 @@ export REDDIT="$ADDRESS:9999"
 export WIKIPEDIA="$ADDRESS:8888"
 export HOMEPAGE="$ADDRESS:4399"
 export OPENAI_API_KEY="empty" # local inference
-export OPENAI_BASE_URL="http://127.0.0.1:8000"
+export OPENAI_BASE_URL="http://127.0.0.1:8000/v1"
