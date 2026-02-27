@@ -496,6 +496,8 @@ class PageImageEvaluator(Evaluator):
         config_file: Path | str,
         page: Page | PseudoPage | None = None
     ) -> float:
+        if self.captioning_fn is None:
+            return 0.0
         with open(config_file, "r") as f:
             configs = json.load(f)
 

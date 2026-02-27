@@ -40,6 +40,13 @@ from browser_env.helper_functions import (
 )
 from evaluation_harness import evaluator_router, image_utils
 
+# Ensure NLTK punkt is available for StringEvaluator (must_include / word_tokenize).
+try:
+    import nltk
+    nltk.download("punkt", quiet=True)
+except Exception:
+    pass
+
 DATASET = os.environ["DATASET"]
 
 LOG_FOLDER = "log_files"
@@ -269,9 +276,16 @@ def test(
     ]:
         device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
         dtype = torch.float16 if torch.cuda.is_available() else torch.float32
-        caption_image_fn = image_utils.get_captioning_fn(
-            device, dtype, args.captioning_model
-        )
+        try:
+            caption_image_fn = image_utils.get_captioning_fn(
+                device, dtype, args.captioning_model
+            )
+        except Exception as e:
+            logger.warning(
+                f"Captioning model failed to load ({e}); continuing without it. "
+                "Tasks requiring VQA eval may fail."
+            )
+            caption_image_fn = None
     else:
         caption_image_fn = None
 
@@ -283,16 +297,22 @@ def test(
         ):
             eval_caption_image_fn = caption_image_fn
         else:
-            eval_caption_image_fn = image_utils.get_captioning_fn(
-                args.eval_captioning_model_device,
-                torch.float16
-                if (
-                    torch.cuda.is_available()
-                    and args.eval_captioning_model_device == "cuda"
+            try:
+                eval_caption_image_fn = image_utils.get_captioning_fn(
+                    args.eval_captioning_model_device,
+                    torch.float16
+                    if (
+                        torch.cuda.is_available()
+                        and args.eval_captioning_model_device == "cuda"
+                    )
+                    else torch.float32,
+                    args.eval_captioning_model,
                 )
-                else torch.float32,
-                args.eval_captioning_model,
-            )
+            except Exception as e:
+                logger.warning(
+                    f"Eval captioning model failed to load ({e}); continuing without it."
+                )
+                eval_caption_image_fn = None
     else:
         caption_image_fn = None
         eval_caption_image_fn = None

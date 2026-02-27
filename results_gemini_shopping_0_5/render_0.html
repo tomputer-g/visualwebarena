@@ -1,0 +1,32 @@
+
+<!DOCTYPE html>
+<head>
+    <style>
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<html>
+    <body>
+     <pre>sites: ['shopping']
+task_id: 0
+require_login: True
+storage_state: ./.auth/shopping_state.json
+start_url: http://ec2-3-18-239-11.us-east-2.compute.amazonaws.com:7770
+geolocation: None
+intent_template: Buy the least expensive {{product}} from "{{category}}" category.
+intent: Buy the least expensive red blanket (in any size) from "Blankets & Throws" category.
+instantiation_dict: {'category': 'Blankets & Throws', 'product': 'red blanket (in any size)'}
+require_reset: False
+eval: {'eval_types': ['program_html'], 'reference_answers': None, 'reference_url': '', 'program_html': [{'url': 'func:shopping_get_latest_order_url()', 'locator': 'document.querySelector(".order-details-items.ordered").outerText', 'required_contents': {'must_include': ['B0983XCYK6', 'Red']}}]}
+intent_template_id: 0
+reasoning_difficulty: medium
+visual_difficulty: easy
+comments: 
+overall_difficulty: medium
+</pre>
+
+    </body>
+</html>

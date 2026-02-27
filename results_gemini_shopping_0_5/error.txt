@@ -1,0 +1,6 @@
+[Config file]: config_files/vwa/test_shopping/0.json
+[Unhandled Error] AssertionError()
+Traceback (most recent call last):
+  File "/home/abhishek/wva/visualwebarena/run.py", line 367, in test
+    assert os.path.exists(_c["storage_state"])
+AssertionError

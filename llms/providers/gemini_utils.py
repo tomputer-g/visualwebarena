@@ -1,10 +1,12 @@
 """Tools to generate from Gemini prompts."""
 
+import os
 import random
 import time
 from typing import Any
 
 from google.api_core.exceptions import InvalidArgument
+import vertexai
 from vertexai.preview.generative_models import (
     GenerativeModel,
     HarmBlockThreshold,
@@ -12,7 +14,10 @@ from vertexai.preview.generative_models import (
     Image,
 )
 
-model = GenerativeModel("gemini-pro-vision")
+_project = os.environ.get("GOOGLE_CLOUD_PROJECT", "abhishek-webarena")
+_location = os.environ.get("VERTEX_AI_LOCATION", "us-central1")
+vertexai.init(project=_project, location=_location)
+model = GenerativeModel("gemini-2.0-flash-001")
 
 
 def retry_with_exponential_backoff(  # type: ignore
