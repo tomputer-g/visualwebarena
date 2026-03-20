@@ -13,7 +13,7 @@ def get_captioning_fn(
     device, dtype, model_name: str = "Salesforce/blip2-flan-t5-xl"
 ) -> callable:
     if "blip2" in model_name:
-        captioning_processor = Blip2Processor.from_pretrained(model_name)
+        captioning_processor = Blip2Processor.from_pretrained(model_name, use_fast=False)
         captioning_model = Blip2ForConditionalGeneration.from_pretrained(
             model_name, torch_dtype=dtype
         )
