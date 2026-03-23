@@ -62,6 +62,7 @@ def is_expired(
     browser = playwright.chromium.launch(headless=True, slow_mo=SLOW_MO)
     context = browser.new_context(storage_state=storage_state)
     page = context.new_page()
+    print("Going to " + str(url))
     page.goto(url)
     time.sleep(1)
     d_url = page.url
@@ -90,7 +91,7 @@ def renew_comb(comb: list[str], auth_folder: str = "./.auth") -> None:
         page.get_by_label("Email", exact=True).fill(username)
         page.get_by_label("Password", exact=True).fill(password)
         page.get_by_role("button", name="Sign In").click()
-
+        print("Shopping signin")
     if "reddit" in comb:
         username = ACCOUNTS["reddit"]["username"]
         password = ACCOUNTS["reddit"]["password"]
@@ -98,7 +99,7 @@ def renew_comb(comb: list[str], auth_folder: str = "./.auth") -> None:
         page.get_by_label("Username").fill(username)
         page.get_by_label("Password").fill(password)
         page.get_by_role("button", name="Log in").click()
-
+        print("Reddit signin")
     if "classifieds" in comb:
         username = ACCOUNTS["classifieds"]["username"]
         password = ACCOUNTS["classifieds"]["password"]
@@ -106,7 +107,7 @@ def renew_comb(comb: list[str], auth_folder: str = "./.auth") -> None:
         page.locator("#email").fill(username)
         page.locator("#password").fill(password)
         page.get_by_role("button", name="Log in").click()
-
+        print("Classified signin")
     if "shopping_admin" in comb:
         username = ACCOUNTS["shopping_admin"]["username"]
         password = ACCOUNTS["shopping_admin"]["password"]
@@ -114,7 +115,7 @@ def renew_comb(comb: list[str], auth_folder: str = "./.auth") -> None:
         page.get_by_placeholder("user name").fill(username)
         page.get_by_placeholder("password").fill(password)
         page.get_by_role("button", name="Sign in").click()
-
+        print("Shopping admin signin")
     if "gitlab" in comb:
         username = ACCOUNTS["gitlab"]["username"]
         password = ACCOUNTS["gitlab"]["password"]
@@ -124,7 +125,7 @@ def renew_comb(comb: list[str], auth_folder: str = "./.auth") -> None:
         page.get_by_test_id("username-field").press("Tab")
         page.get_by_test_id("password-field").fill(password)
         page.get_by_test_id("sign-in-button").click()
-
+        print("Gitlab signin")
     context.storage_state(path=f"{auth_folder}/{'.'.join(comb)}_state.json")
 
     context_manager.__exit__()
