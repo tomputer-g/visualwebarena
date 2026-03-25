@@ -6,7 +6,7 @@ from transformers import LlamaTokenizer  # type: ignore
 
 class Tokenizer(object):
     def __init__(self, provider: str, model_name: str) -> None:
-        if "Qwen2.5" in model_name:
+        if "Qwen2.5" in model_name or "ViGoRL" in model_name:
             self.tokenizer = None
         else:
             if provider == "openai":

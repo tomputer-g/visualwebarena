@@ -7,5 +7,5 @@ python run.py \
    --test_config_base_dir=config_files/vwa/test_reddit  \
    --model gsarch/ViGoRL-7b-Web-Action   \
    --action_set_tag som  --observation_type image_som \
-   --provider vigorl --max_obs_length 15360 --mode chat \
+   --provider openai --max_obs_length 15360 --mode chat \
    --agent_type vigorl
