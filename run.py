@@ -450,6 +450,7 @@ def test(
                 env.save_trace(
                     Path(args.result_dir) / "traces" / f"{task_id}.zip"
                 )
+            render_helper.close()
         except openai.OpenAIError as e:
             logger.info(f"[OpenAI Error] {repr(e)}")
         except Exception as e:
@@ -462,7 +463,6 @@ def test(
                 f.write(f"[Unhandled Error] {repr(e)}\n")
                 f.write(traceback.format_exc())  # write stack trace to file
 
-        render_helper.close()
 
     env.close()
     if len(scores):
