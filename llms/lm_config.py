@@ -52,6 +52,16 @@ def construct_llm_config(args: argparse.Namespace) -> LMConfig:
         llm_config.gen_config["max_obs_length"] = args.max_obs_length
         llm_config.gen_config["model_endpoint"] = args.model_endpoint
         llm_config.gen_config["max_retry"] = args.max_retry
+    elif args.provider == "vigorl":
+        llm_config.gen_config["temperature"] = args.temperature
+        llm_config.gen_config["max_new_tokens"] = args.max_tokens
+        llm_config.gen_config["max_obs_length"] = args.max_obs_length
+        llm_config.gen_config["max_retry"] = args.max_retry
+        # ViGORL-specific defaults (override via gen_config after construction
+        # if you need non-default zoom parameters).
+        llm_config.gen_config["max_turns"] = 5
+        llm_config.gen_config["crop_offset"] = 182
+        llm_config.gen_config["crop_size"] = 672
     else:
         raise NotImplementedError(f"provider {args.provider} not implemented")
     return llm_config

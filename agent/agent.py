@@ -204,6 +204,14 @@ def construct_agent(args: argparse.Namespace, captioning_fn=None) -> Agent:
     agent: Agent
     if args.agent_type == "teacher_forcing":
         agent = TeacherForcingAgent()
+    elif args.agent_type == "vigorl":
+        from agent.vigorl_agent import ViGORLAgent
+        agent = ViGORLAgent(
+            model_name=args.model,
+            instruction_path=args.instruction_path,
+            action_set_tag=args.action_set_tag,
+            lm_config=llm_config,
+        )
     elif args.agent_type == "prompt":
         with open(args.instruction_path) as f:
             constructor_type = json.load(f)["meta_data"]["prompt_constructor"]
