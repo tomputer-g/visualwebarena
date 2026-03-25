@@ -22,7 +22,6 @@ from llms import (
 )
 from llms.tokenizers import Tokenizer
 
-
 class Agent:
     """Base class for the agent"""
 
@@ -198,6 +197,132 @@ class PromptAgent(Agent):
         pass
 
 
+class ViGORLAgent(Agent):
+    """PromptAgent variant that runs a locally loaded Qwen2.5-VL checkpoint.
+
+    Mirrors PromptAgent's single-turn workflow; the only difference is that
+    generation is performed locally via Transformers instead of via call_llm.
+    """
+
+    @beartype
+    def __init__(
+        self,
+        model_name: str,
+        action_set_tag: str,
+        lm_config: lm_config.LMConfig,
+        prompt_constructor: PromptConstructor,
+    ) -> None:
+        super().__init__()
+        self.model_name = model_name
+        self.action_set_tag = action_set_tag
+        self.lm_config = lm_config
+        self.prompt_constructor = prompt_constructor
+        self._model = None
+        self._processor = None
+
+    def set_action_set_tag(self, tag: str) -> None:
+        self.action_set_tag = tag
+
+    def _load_model(self) -> None:
+        if self._model is not None:
+            return
+        from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
+
+        print(f"[ViGORLAgent] Loading {self.model_name} …", flush=True)
+        self._model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+            self.model_name,
+        )
+        self._processor = AutoProcessor.from_pretrained(
+            self.model_name,
+            max_pixels=12960000,
+            min_pixels=3136,
+        )
+
+    def _generate(
+        self, messages: list[dict], temperature: float, max_new_tokens: int
+    ) -> str:
+        from qwen_vl_utils import process_vision_info
+
+        text_prompt = self._processor.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+        img_inputs, vid_inputs = process_vision_info(messages)
+        inputs = self._processor(
+            text=[text_prompt],
+            images=img_inputs,
+            videos=vid_inputs,
+            padding=True,
+            return_tensors="pt",
+        ).to(self._model.device)
+
+        do_sample = temperature > 0.0
+        gen_ids = self._model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature if do_sample else None,
+            do_sample=do_sample,
+        )
+        trimmed = gen_ids[:, inputs.input_ids.shape[1]:]
+        return self._processor.batch_decode(
+            trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
+        )[0]
+
+    @beartype
+    def next_action(
+        self,
+        trajectory: Trajectory,
+        intent: str,
+        meta_data: dict[str, Any],
+        images: Optional[list[Image.Image]] = None,
+        output_response: bool = False,
+    ) -> Action:
+        self._load_model()
+
+        page_screenshot_img = Image.fromarray(
+            trajectory[-1]["observation"]["image"]  # type: ignore[index]
+        )
+        messages: list[dict] = self.prompt_constructor.construct(  # type: ignore[assignment,call-arg]
+            trajectory, intent, page_screenshot_img, images or [], meta_data
+        )
+
+        gc = self.lm_config.gen_config
+        temperature    = gc.get("temperature", 0.5)
+        max_new_tokens = gc.get("max_new_tokens", 512)
+
+        n = 0
+        while True:
+            response = self._generate(messages, temperature, max_new_tokens)
+            force_prefix = self.prompt_constructor.instruction["meta_data"].get(
+                "force_prefix", ""
+            )
+            response = f"{force_prefix}{response}"
+            if output_response:
+                print(f"[ViGORLAgent] {response}", flush=True)
+            n += 1
+            try:
+                parsed_response = self.prompt_constructor.extract_action(response)
+                if self.action_set_tag == "id_accessibility_tree":
+                    action = create_id_based_action(parsed_response)
+                elif self.action_set_tag == "playwright":
+                    action = create_playwright_action(parsed_response)
+                elif self.action_set_tag == "som":
+                    action = create_id_based_action(parsed_response)
+                else:
+                    raise ValueError(f"Unknown action type {self.action_set_tag}")
+                action["raw_prediction"] = response
+                break
+            except ActionParsingError:
+                if n >= gc["max_retry"]:
+                    action = create_none_action()
+                    action["raw_prediction"] = response
+                    break
+
+        return action
+
+    def reset(self, test_config_file: str) -> None:
+        pass
+
+
 def construct_agent(args: argparse.Namespace, captioning_fn=None) -> Agent:
     llm_config = lm_config.construct_llm_config(args)
 
@@ -205,12 +330,17 @@ def construct_agent(args: argparse.Namespace, captioning_fn=None) -> Agent:
     if args.agent_type == "teacher_forcing":
         agent = TeacherForcingAgent()
     elif args.agent_type == "vigorl":
-        from agent.vigorl_agent import ViGORLAgent
+        with open(args.instruction_path) as f:
+            constructor_type = json.load(f)["meta_data"]["prompt_constructor"]
+        tokenizer = Tokenizer(args.provider, args.model)
+        prompt_constructor = eval(constructor_type)(
+            args.instruction_path, lm_config=llm_config, tokenizer=tokenizer
+        )
         agent = ViGORLAgent(
             model_name=args.model,
-            instruction_path=args.instruction_path,
             action_set_tag=args.action_set_tag,
             lm_config=llm_config,
+            prompt_constructor=prompt_constructor,
         )
     elif args.agent_type == "prompt":
         with open(args.instruction_path) as f:

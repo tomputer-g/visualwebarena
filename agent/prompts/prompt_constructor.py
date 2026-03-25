@@ -444,3 +444,73 @@ class MultimodalCoTPromptConstructor(CoTPromptConstructor):
             raise NotImplementedError(
                 f"Provider {self.lm_config.provider} not implemented"
             )
+
+
+class ViGORLPromptConstructor(MultimodalCoTPromptConstructor):
+    """Prompt constructor for ViGORL (Qwen2.5-VL) models.
+
+    Builds Qwen-format chat messages (system/user/assistant turns) and
+    extracts actions from ``<answer>...</answer>`` tags.
+    """
+
+    def __init__(
+        self,
+        instruction_path: str | Path,
+        lm_config: lm_config.LMConfig,
+        tokenizer: Tokenizer | None = None,
+    ):
+        if tokenizer is None:
+            class _CharTokenizer:
+                """Identity tokenizer — obs truncation is character-based."""
+                def encode(self, text: str) -> str:  # type: ignore[override]
+                    return text
+                def decode(self, x: str) -> str:  # type: ignore[override]
+                    return x
+            tokenizer = _CharTokenizer()  # type: ignore[assignment]
+        super().__init__(instruction_path, lm_config, tokenizer)  # type: ignore[arg-type]
+        # Override obs_modality from instruction meta_data (parent defaults to "text").
+        self.obs_modality = self.instruction["meta_data"].get("observation", "text")
+
+    def get_lm_api_input(
+        self,
+        intro: str,
+        examples: list[tuple[str, str, str]],
+        current: str,
+        page_screenshot_img: Image.Image,
+        images: list[Image.Image],
+    ) -> APIInput:
+        """Return Qwen-format chat messages."""
+        messages: list[dict] = [{"role": "system", "content": intro}]
+
+        for obs_text, action_text, img_path in examples:
+            example_img = Image.open(img_path)
+            messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": obs_text},
+                    {"type": "text", "text": "IMAGES: (1) current page screenshot"},
+                    {"type": "image", "image": example_img},
+                ],
+            })
+            messages.append({
+                "role": "assistant",
+                "content": [{"type": "text", "text": action_text}],
+            })
+
+        user_content: list[dict] = [
+            {"type": "text", "text": current},
+            {"type": "text", "text": "IMAGES: (1) current page screenshot"},
+            {"type": "image", "image": page_screenshot_img},
+        ]
+        for i, img in enumerate(images):
+            user_content.append({"type": "text", "text": f"({i + 2}) input image {i + 1}"})
+            user_content.append({"type": "image", "image": img})
+
+        messages.append({"role": "user", "content": user_content})
+        return messages
+
+    def _extract_action(self, response: str) -> str:
+        m = re.search(r"<answer>\s*(.*?)\s*</answer>", response, re.DOTALL)
+        if m:
+            return m.group(1).strip()
+        raise ActionParsingError(f"Cannot parse action from response {response}")
