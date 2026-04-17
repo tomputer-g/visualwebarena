@@ -1,0 +1,7 @@
+The user wants to find a storage option for 31 Nintendo Switch game cards.
+I will use the search bar to find relevant products. The search bar has bid '258'.
+I will fill it with "Nintendo Switch game card storage" and press Enter to initiate the search.
+
+action:
+fill('258', 'Nintendo Switch game card storage')
+press('258', 'Enter')

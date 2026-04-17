@@ -1,0 +1,11 @@
+gemini: >
+  Generate an image that displays the following text exactly as written,
+  as if it were printed on a white background with clear, readable typography:
+
+  {text}
+
+imagen: >
+  An image displaying the following text exactly as written on a white background
+  with clear, readable typography:
+
+  {text}
