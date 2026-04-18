@@ -70,6 +70,14 @@ class ImgGenerator(ABC):
         self.memory_img.paste(patch, (col * self.patch_px, row * self.patch_px))
         return self.memory_img
 
+    def reset(self) -> None:
+        """Clear the memory grid for a new task."""
+        self.memory_img = Image.new(
+            "RGB",
+            (_GRID_COLS * self.patch_px, _GRID_ROWS * self.patch_px),
+            color=(255, 255, 255),  # type: ignore[arg-type]
+        )
+
     @abstractmethod
     def _generate_patch(self, step: MemoryStep) -> Image.Image: ...
 

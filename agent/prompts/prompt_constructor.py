@@ -10,6 +10,7 @@ from browser_env.utils import StateInfo, pil_to_b64, pil_to_vertex
 from llms import lm_config
 from llms.tokenizers import Tokenizer
 from llms.utils import APIInput
+from .vlm_img_generator import VLMImgGenerator, LocalImgGenerator, ImgGenerator
 
 
 class Instruction(TypedDict):
@@ -277,9 +278,11 @@ class MultimodalCoTPromptConstructor(CoTPromptConstructor):
         instruction_path: str | Path,
         lm_config: lm_config.LMConfig,
         tokenizer: Tokenizer,
+        memory_img_generator: VLMImgGenerator | LocalImgGenerator | None = None,
     ):
         super().__init__(instruction_path, lm_config, tokenizer)
         self.answer_phrase = self.instruction["meta_data"]["answer_phrase"]
+        self.memory_img_generator = memory_img_generator
 
     def construct(
         self,
@@ -316,8 +319,10 @@ class MultimodalCoTPromptConstructor(CoTPromptConstructor):
 
         assert all([f"{{k}}" not in current for k in keywords])
 
+        memory_img = self.memory_img_generator.memory_img if self.memory_img_generator is not None else None
+
         prompt = self.get_lm_api_input(
-            intro, examples, current, page_screenshot_img, images
+            intro, examples, current, page_screenshot_img, images, memory_img
         )
         return prompt
 
@@ -328,6 +333,7 @@ class MultimodalCoTPromptConstructor(CoTPromptConstructor):
         current: str,
         page_screenshot_img: Image.Image,
         images: list[Image.Image],
+        memory_img: Image.Image | None = None,
     ) -> APIInput:
         """Return the require format for an API"""
         message: list[dict[str, str]] | str | list[str | Image.Image]
@@ -393,6 +399,20 @@ class MultimodalCoTPromptConstructor(CoTPromptConstructor):
                             },
                         ]
                     )
+
+                if memory_img is not None:
+                    content.extend(
+                        [
+                            {
+                                "type": "text",
+                                "text": "Summary of previous steps taken during this task, with your previous chain-of-thought and action choices if applicable.",
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": pil_to_b64(memory_img)},
+                            },
+                        ]
+                    )
                 content = [{"type": "text", "text": current_prompt}] + content
 
                 message.append({"role": "user", "content": content})
@@ -432,6 +452,13 @@ class MultimodalCoTPromptConstructor(CoTPromptConstructor):
                         [
                             f"({image_i+2}) input image {image_i+1}",
                             pil_to_vertex(image),
+                        ]
+                    )
+                if memory_img is not None: #Prob not going to be used but no harm in writing this
+                    message.extend(
+                        [
+                            "Summary of previous steps taken during this task, with your previous chain-of-thought and action choices if applicable.",
+                            pil_to_vertex(memory_img),
                         ]
                     )
                 message.append("Action:")

@@ -40,6 +40,8 @@ from browser_env.helper_functions import (
 )
 from evaluation_harness import evaluator_router, image_utils
 
+from .vlm_img_generator import VLMImgGenerator, LocalImgGenerator
+
 DATASET = os.environ["DATASET"]
 
 LOG_FOLDER = "log_files"
@@ -297,11 +299,14 @@ def test(
         caption_image_fn = None
         eval_caption_image_fn = None
 
+    memory_img_generator = LocalImgGenerator() if args.agent_type == "prompt" else None
+
     agent = construct_agent(
         args,
         captioning_fn=caption_image_fn
         if args.observation_type == "accessibility_tree_with_captioner"
         else None,
+        memory_img_generator=memory_img_generator
     )  # NOTE: captioning_fn here is used for captioning input images.
 
     env = ScriptBrowserEnv(
@@ -375,6 +380,8 @@ def test(
             logger.info(f"[Intent]: {intent}")
 
             agent.reset(config_file)
+            if memory_img_generator is not None:
+                memory_img_generator.reset()
             trajectory: Trajectory = []
             obs, info = env.reset(options={"config_file": config_file})
             state_info: StateInfo = {"observation": obs, "info": info}

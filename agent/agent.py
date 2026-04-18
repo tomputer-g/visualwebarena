@@ -137,6 +137,8 @@ class PromptAgent(Agent):
                 page_screenshot_arr
             )  # size = (viewport_width, viewport_width)
 
+        state_info: StateInfo = trajectory[-1]  # type: ignore[assignment]
+
         # Caption the input image, if provided.
         if images is not None and len(images) > 0:
             if self.captioning_fn is not None:
@@ -148,17 +150,13 @@ class PromptAgent(Agent):
                         image_input_caption += f'input image {image_i+1}: "{self.captioning_fn([image])[0]}"'
                     if len(images) > 1:
                         image_input_caption += ", "
-                # Update intent to include captions of input images.
                 intent = f"{image_input_caption}\nIntent: {intent}"
             elif not self.multimodal_inputs:
                 print(
                     "WARNING: Input image provided but no image captioner available."
                 )
 
-        if self.memory_img_generator is not None:
-            # TODO make new prompt constructor that has the memory image generator
-            pass
-        elif self.multimodal_inputs:
+        if self.multimodal_inputs:
             prompt = self.prompt_constructor.construct(
                 trajectory, intent, page_screenshot_img, images, meta_data
             )
@@ -166,8 +164,8 @@ class PromptAgent(Agent):
             prompt = self.prompt_constructor.construct(
                 trajectory, intent, meta_data
             )
+
         lm_config = self.lm_config
-        state_info: StateInfo = trajectory[-1]  # type: ignore[assignment]
         n = 0
         parsed_response = ""
         while True:
@@ -200,22 +198,22 @@ class PromptAgent(Agent):
                     action = create_none_action()
                     action["raw_prediction"] = response
                     break
-            finally:
-                if self.memory_img_generator is not None:
-                    self.memory_img_generator.generate_img(
-                        step_num=(len(trajectory) - 1) // 2, # from demo: trajectory contains s0, a0, s1, a1, ..., so the step number is (len(trajectory)-1)//2
-                        intent=intent,
-                        dom_tree=str(state_info["observation"]["text"]),
-                        cot=response,
-                        action=parsed_response,
-                    )
+
+        if self.memory_img_generator is not None:
+            self.memory_img_generator.generate_img(
+                step_num=(len(trajectory) - 1) // 2,
+                intent=intent,
+                dom_tree=str(state_info["observation"]["text"]),
+                cot=response,
+                action=parsed_response,
+            )
         return action
 
     def reset(self, test_config_file: str) -> None:
         pass
 
 
-def construct_agent(args: argparse.Namespace, captioning_fn=None) -> Agent:
+def construct_agent(args: argparse.Namespace, captioning_fn=None, memory_img_generator: VLMImgGenerator | LocalImgGenerator | None = None) -> Agent:
     llm_config = lm_config.construct_llm_config(args)
 
     agent: Agent
@@ -225,14 +223,21 @@ def construct_agent(args: argparse.Namespace, captioning_fn=None) -> Agent:
         with open(args.instruction_path) as f:
             constructor_type = json.load(f)["meta_data"]["prompt_constructor"]
         tokenizer = Tokenizer(args.provider, args.model)
-        prompt_constructor = eval(constructor_type)(
-            args.instruction_path, lm_config=llm_config, tokenizer=tokenizer
-        )
+        cls = eval(constructor_type)
+        if cls == MultimodalCoTPromptConstructor:
+            prompt_constructor = cls(
+                args.instruction_path, lm_config=llm_config, tokenizer=tokenizer, memory_img_generator=memory_img_generator
+            )
+        else:
+            prompt_constructor = cls(
+                args.instruction_path, lm_config=llm_config, tokenizer=tokenizer
+            )
         agent = PromptAgent(
             action_set_tag=args.action_set_tag,
             lm_config=llm_config,
             prompt_constructor=prompt_constructor,
-            captioning_fn=captioning_fn
+            captioning_fn=captioning_fn,
+            memory_img_generator=memory_img_generator
         )
     else:
         raise NotImplementedError(
