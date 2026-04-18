@@ -22,6 +22,8 @@ from llms import (
 )
 from llms.tokenizers import Tokenizer
 
+from .vlm_img_generator import VLMImgGenerator, LocalImgGenerator, ImgGenerator
+
 
 class Agent:
     """Base class for the agent"""
@@ -104,6 +106,7 @@ class PromptAgent(Agent):
         action_set_tag: str,
         lm_config: lm_config.LMConfig,
         prompt_constructor: PromptConstructor,
+        memory_img_generator: Optional[ImgGenerator] = None,
         captioning_fn = None,
     ) -> None:
         super().__init__()
@@ -111,6 +114,7 @@ class PromptAgent(Agent):
         self.prompt_constructor = prompt_constructor
         self.action_set_tag = action_set_tag
         self.captioning_fn = captioning_fn
+        self.memory_img_generator = memory_img_generator
 
         # Check if the model is multimodal.
         if ("Qwen2.5-VL" in lm_config.model or "gemini" in lm_config.model or "gpt-4" in lm_config.model and "vision" in lm_config.model) and type(prompt_constructor) == MultimodalCoTPromptConstructor:
@@ -151,7 +155,10 @@ class PromptAgent(Agent):
                     "WARNING: Input image provided but no image captioner available."
                 )
 
-        if self.multimodal_inputs:
+        if self.memory_img_generator is not None:
+            # TODO make new prompt constructor that has the memory image generator
+            pass
+        elif self.multimodal_inputs:
             prompt = self.prompt_constructor.construct(
                 trajectory, intent, page_screenshot_img, images, meta_data
             )
@@ -160,7 +167,9 @@ class PromptAgent(Agent):
                 trajectory, intent, meta_data
             )
         lm_config = self.lm_config
+        state_info: StateInfo = trajectory[-1]  # type: ignore[assignment]
         n = 0
+        parsed_response = ""
         while True:
             response = call_llm(lm_config, prompt)
             force_prefix = self.prompt_constructor.instruction[
@@ -191,7 +200,15 @@ class PromptAgent(Agent):
                     action = create_none_action()
                     action["raw_prediction"] = response
                     break
-
+            finally:
+                if self.memory_img_generator is not None:
+                    self.memory_img_generator.generate_img(
+                        step_num=(len(trajectory) - 1) // 2, # from demo: trajectory contains s0, a0, s1, a1, ..., so the step number is (len(trajectory)-1)//2
+                        intent=intent,
+                        dom_tree=str(state_info["observation"]["text"]),
+                        cot=response,
+                        action=parsed_response,
+                    )
         return action
 
     def reset(self, test_config_file: str) -> None:
