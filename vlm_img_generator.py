@@ -66,8 +66,9 @@ class ImgGenerator(ABC):
     ) -> Image.Image:
         step = MemoryStep(intent=intent, dom_tree=dom_tree, cot=cot, action=action)
         patch = self._generate_patch(step)
-        row, col = divmod(step_num % _NUM_CELLS, _GRID_COLS)
-        self.memory_img.paste(patch, (col * self.patch_px, row * self.patch_px))
+        fitted_patch = self.fit_patch(patch)
+        row, col = divmod(step_num % _NUM_CELLS, _GRID_COLS) # circular rewrite handling of excess steps.
+        self.memory_img.paste(fitted_patch, (col * self.patch_px, row * self.patch_px))
         return self.memory_img
 
     def reset(self) -> None:
@@ -77,6 +78,23 @@ class ImgGenerator(ABC):
             (_GRID_COLS * self.patch_px, _GRID_ROWS * self.patch_px),
             color=(255, 255, 255),  # type: ignore[arg-type]
         )
+
+    def fit_patch(self, patch: Image.Image) -> Image.Image:
+        """Return ``patch`` fitted to ``self.patch_px`` × ``self.patch_px``.
+
+        Oversized (square) patches are downscaled with Lanczos resampling;
+        undersized patches are centered on a white canvas.
+        """
+        target = self.patch_px
+        size = patch.size[0]
+        if size == target:
+            return patch
+        if size > target:
+            return patch.resize((target, target), Image.Resampling.LANCZOS)  # type: ignore[attr-defined]
+        fitted_patch = Image.new("RGB", (target, target), color=(255, 255, 255))  # type: ignore[arg-type]
+        offset = (target - size) // 2
+        fitted_patch.paste(patch, (offset, offset))
+        return fitted_patch
 
     @abstractmethod
     def _generate_patch(self, step: MemoryStep) -> Image.Image: ...
